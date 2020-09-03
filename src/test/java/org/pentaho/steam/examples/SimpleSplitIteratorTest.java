@@ -24,8 +24,6 @@
 
 package org.pentaho.steam.examples;
 
-import org.junit.Assert;
-
 import java.util.List;
 import java.util.Spliterator;
 import java.util.stream.Collectors;
@@ -52,19 +50,19 @@ class SimpleSplitIteratorTest {
     SimpleSplitIterator ssi = new SimpleSplitIterator( 1, 10 );
     ssi.add( new Resource( 21, "Test" ) );
     Resource r = ssi.pop();
-    Assert.assertEquals( 21, r.getId() );
-    Assert.assertEquals( "Test", r.getName()  );
+    assertEquals( 21, r.getId() );
+    assertEquals( "Test", r.getName()  );
   }
 
   @org.junit.jupiter.api.Test
   void split() {
     Resource[] resArr =  resources.split( 0, 5 );
-    Assert.assertEquals( 5, resArr.length );
-    Assert.assertEquals( 0, resArr[0].getId() );
-    Assert.assertEquals( 1, resArr[1].getId() );
-    Assert.assertEquals( 2, resArr[2].getId() );
-    Assert.assertEquals( 3, resArr[3].getId() );
-    Assert.assertEquals( 4, resArr[4].getId() );
+    assertEquals( 5, resArr.length );
+    assertEquals( 0, resArr[0].getId() );
+    assertEquals( 1, resArr[1].getId() );
+    assertEquals( 2, resArr[2].getId() );
+    assertEquals( 3, resArr[3].getId() );
+    assertEquals( 4, resArr[4].getId() );
   }
 
   @org.junit.jupiter.api.Test
@@ -72,10 +70,10 @@ class SimpleSplitIteratorTest {
     SimpleSplitIterator ssi = new SimpleSplitIterator( 1, 10 );
     ssi.add( new Resource( 21, "Test" ) );
     Resource r = ssi.pop();
-    Assert.assertEquals( 21, r.getId() );
-    Assert.assertEquals( "Test", r.getName()  );
+    assertEquals( 21, r.getId() );
+    assertEquals( "Test", r.getName()  );
     r = ssi.pop();
-    Assert.assertNull( r );
+    assertNull( r );
   }
 
   @org.junit.jupiter.api.Test
@@ -85,48 +83,48 @@ class SimpleSplitIteratorTest {
     while ( resources.tryAdvance( resourceAction -> resourceAction.setName( resourceAction.getName().concat( "-Action" ) ) ) ) {
       index++;
     }
-    Assert.assertEquals( size - 1, index );
+    assertEquals( size - 1, index );
     resources.reset();
     Stream<Resource> resStream = StreamSupport.stream( resources, true );
-    Assert.assertEquals( size, resStream.count() );
+    assertEquals( size, resStream.count() );
     resources.reset();
     resStream = StreamSupport.stream( resources, true );
-    Assert.assertEquals( size, resStream.parallel().filter( r -> { return r.getName().endsWith("-Action"); } ).count() );
+    assertEquals( size, resStream.parallel().filter( r -> { return r.getName().endsWith("-Action"); } ).count() );
   }
 
   @org.junit.jupiter.api.Test
   void trySplit() {
     Spliterator<Resource> si = resources.trySplit();
     int expected = size / 2;
-    Assert.assertEquals( expected, si.estimateSize() );
+    assertEquals( expected, si.estimateSize() );
     si = si.trySplit();
     expected = expected / 2;
-    Assert.assertEquals( expected, si.estimateSize() );
+    assertEquals( expected, si.estimateSize() );
   }
 
   @org.junit.jupiter.api.Test
   void estimateSize() {
-    Assert.assertEquals( size, resources.estimateSize() );
+    assertEquals( size, resources.estimateSize() );
   }
 
   @org.junit.jupiter.api.Test
   void characteristics() {
-    Assert.assertEquals( Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.CONCURRENT | Spliterator.SIZED | Spliterator.SUBSIZED, resources.characteristics() );
+    assertEquals( Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.CONCURRENT | Spliterator.SIZED | Spliterator.SUBSIZED, resources.characteristics() );
   }
 
   @org.junit.jupiter.api.Test
   void functionalStreamingTest() {
     // See if we can filter out the first 50 resources
     Stream<Resource> resStream = StreamSupport.stream( resources, true );
-    Assert.assertEquals( 50, resStream.parallel().filter( r -> { return r.getId() < 50; } ).count() );
+    assertEquals( 50, resStream.parallel().filter( r -> { return r.getId() < 50; } ).count() );
 
     // See if we can filter out the first 3 resources and return as a sorted collection.
     resources.reset();
     resStream = StreamSupport.stream( resources, true );
     List<Resource> resList = resStream.parallel().filter( r -> { return r.getId() < 3; } ).sorted().collect( Collectors.toList() );
 
-    Assert.assertEquals( 0, resList.get(0).getId() );
-    Assert.assertEquals( 1, resList.get(1).getId() );
-    Assert.assertEquals( 2, resList.get(2).getId() );
+    assertEquals( 0, resList.get(0).getId() );
+    assertEquals( 1, resList.get(1).getId() );
+    assertEquals( 2, resList.get(2).getId() );
   }
 }
