@@ -24,6 +24,13 @@
 
 package org.pentaho.steam.examples;
 
+import org.apache.http.NameValuePair;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class CatalogSplitIteratorTest {
@@ -34,14 +41,38 @@ class CatalogSplitIteratorTest {
   void setUp() {
     catItr = new CatalogSplitIterator( "sam_admin",
       "wds",
-      "http://172.20.43.169:32082/api/v2/login/",
+      "172.20.43.169",
+      32082,
+      "http",
       25 );
   }
 
   @org.junit.jupiter.api.Test
-  void getLoginToken() {
-    String token = catItr.getLoginToken();
-    assertNotNull( token );
+  void doGet() {
+    List<NameValuePair> parameters = new ArrayList<>();
+    parameters.add( CatalogSplitIterator.createNamedValuedPair( "start", "1" ) );
+    parameters.add( CatalogSplitIterator.createNamedValuedPair( "size", "25" ) );
+    parameters.add( CatalogSplitIterator.createNamedValuedPair( "browse", "true" ) );
+    JSONObject json = catItr.doGet( "/api/v2/virtualfolder", parameters );
+    assertTrue( json.getInt("totalCount") > 0 );
+
+    // Test zero parameters and returning of JSONArray
+    parameters = new ArrayList<>();
+    json = catItr.doGet( "/api/v2/datasource", parameters );
+    JSONArray jsonArr = json.getJSONArray( "jsonArray" );
+    assertTrue( jsonArr.length() > 0 );
+  }
+
+  @org.junit.jupiter.api.Test
+  void getBrowsableObjects() {
+    JSONObject json = catItr.getBrowsableObjects( "/api/v2/virtualfolder", 1, 5 );
+    JSONArray virtualFolders = json.getJSONArray( "list" );
+    int totalCount = json.getInt("totalCount");
+    assertTrue( totalCount >= 16 );
+    assertTrue( virtualFolders.length() == 5 );
+    json = catItr.getBrowsableObjects( "/api/v2/virtualfolder", 6, 20 );
+    virtualFolders = json.getJSONArray( "list" );
+    assertTrue( virtualFolders.length() == 10 );
   }
 
   @org.junit.jupiter.api.Test
