@@ -54,9 +54,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Spliterator;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-public class CatalogSplitIterator implements Spliterator<JSONObject> {
+public class CatalogSplitIterator implements Spliterator<CatalogCompariable> {
 
   final private String name;
   final private String password;
@@ -64,20 +65,82 @@ public class CatalogSplitIterator implements Spliterator<JSONObject> {
   final private int port;
   final private String scheme;
   final private int pageSize;
+  final private int smallestSplitSize;
   private RequestConfig globalConfig;
   private RequestConfig localConfig;
   final private CookieStore cookieStore;
 
-  CatalogSplitIterator( String name, String password, String host, int port, String scheme, int pageSize ) {
+  private CatalogCompariable[] ccArr;
+  private final AtomicInteger currentSplitPos = new AtomicInteger( 0 );
+  private final int totalCount;
+
+
+  private JSONObject[] createArr( JSONArray jsonArr ) {
+    JSONObject[] jsonObjs = new JSONObject[ jsonArr.length() ];
+    for ( int i=0; i<jsonArr.length(); i++ ) {
+      jsonObjs[i] = jsonArr.getJSONObject( i );
+    }
+    return jsonObjs;
+  }
+
+  public CatalogSplitIterator( String name, String password, String host, int port, String scheme, int pageSize, int smallestSplitSize, CookieStore cookieStore, int totalCount, CatalogCompariable[] arr) {
     this.name = name;
     this.password = password;
     this.host = host;
     this.port = port;
     this.scheme = scheme;
     this.pageSize = pageSize;
+    this.cookieStore = cookieStore;
+    this.totalCount = totalCount;
+    this.currentSplitPos.set( 0 );
+    this.smallestSplitSize = smallestSplitSize;
+    this.ccArr = arr;
+  }
+
+  public CatalogSplitIterator( String name, String password, String host, int port, String scheme, int pageSize, int smallestSplitSize ) {
+    // TODO PUll query logic out by using existing builders
+    this.name = name;
+    this.password = password;
+    this.host = host;
+    this.port = port;
+    this.scheme = scheme;
+    this.pageSize = pageSize;
+    this.currentSplitPos.set( 0 );
+    this.smallestSplitSize = smallestSplitSize;
     setCookiePolicy();
     cookieStore = new BasicCookieStore();
     cookieStore.addCookie( createSessionCookie() );
+
+    JSONObject json = this.getBrowsableObjects( "/api/v2/virtualfolder", 0, pageSize );
+    totalCount = json.getInt("totalCount");
+    ccArr = new CatalogCompariable[ totalCount ];
+    // Load Objects
+    loadJsonArray( json.getJSONArray( "list" ));
+    loadObjects();
+    reset();
+  }
+
+  public void reset() {
+    currentSplitPos.set( 0 );
+  }
+
+  private void loadJsonArray( JSONArray jsonArray ) {
+    for ( int i = 0; i< jsonArray.length(); i++ ) {
+      int pos = currentSplitPos.getAndIncrement();
+      ccArr[ pos ] = new CatalogCompariable( pos, jsonArray.getJSONObject( i ) );
+    }
+  }
+
+  private void loadObjects() {
+    // TODO Make this parallel in the future
+    JSONObject json = this.getBrowsableObjects( "/api/v2/virtualfolder", currentSplitPos.get(), pageSize );
+    loadJsonArray( json.getJSONArray( "list"  ) );
+    // Terminate
+    if ( currentSplitPos.get() < totalCount ) {
+      loadObjects();
+    } else {
+      return;
+    }
   }
 
   private void setCookiePolicy() {
@@ -199,19 +262,41 @@ public class CatalogSplitIterator implements Spliterator<JSONObject> {
     return securityToken;
   }
 
-  @Override public boolean tryAdvance( Consumer<? super JSONObject> action ) {
-    return false;
+  @Override public boolean tryAdvance( Consumer<? super CatalogCompariable> action ) {
+    action.accept( ccArr[ currentSplitPos.getAndIncrement() ] );
+    return currentSplitPos.get() < ccArr.length;
   }
 
-  @Override public Spliterator<JSONObject> trySplit() {
-    return null;
+  @Override public Spliterator<CatalogCompariable> trySplit() {
+    int currentSize = ccArr.length - currentSplitPos.get();
+    if ( currentSize  <  smallestSplitSize )  {
+      return null;
+    }
+
+    // Split the array
+    int splitPos = currentSize / 2 + currentSplitPos.intValue();
+    Spliterator<CatalogCompariable> spliterator =
+      new CatalogSplitIterator( name, password, host, port, scheme, pageSize, smallestSplitSize, cookieStore, totalCount, split( currentSplitPos.get(), splitPos ) );
+    currentSplitPos.set( splitPos );
+    return spliterator;
   }
 
   @Override public long estimateSize() {
-    return 0;
+    return ccArr.length - (long)currentSplitPos.get();
   }
 
   @Override public int characteristics() {
-    return 0;
+    return CONCURRENT | DISTINCT | ORDERED | SIZED | SUBSIZED;
   }
+
+  public synchronized CatalogCompariable[] split(int begin, int end ) {
+    CatalogCompariable[] arr = null;
+    int len = end - begin;
+    if ( len > 0 ) {
+      arr = new CatalogCompariable[len];
+      System.arraycopy( ccArr, begin, arr, 0, len );
+    }
+    return arr;
+  }
+
 }

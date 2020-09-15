@@ -30,21 +30,28 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Spliterator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CatalogSplitIteratorTest {
 
-  private CatalogSplitIterator catItr;
-
-  @org.junit.jupiter.api.BeforeEach
-  void setUp() {
-    catItr = new CatalogSplitIterator( "sam_admin",
+  static private int pageSize = 5;
+  static private CatalogSplitIterator catItr = new CatalogSplitIterator( "sam_admin",
       "wds",
       "172.20.43.169",
       32082,
       "http",
-      25 );
+      pageSize,
+      5
+    );
+
+  @org.junit.jupiter.api.BeforeEach
+  void setUp() {
+    catItr.reset();
   }
 
   @org.junit.jupiter.api.Test
@@ -76,14 +83,38 @@ class CatalogSplitIteratorTest {
   }
 
   @org.junit.jupiter.api.Test
+  void estimateSize() {
+    assertEquals( 16, catItr.estimateSize() );
+  }
+
+  @org.junit.jupiter.api.Test
   void tryAdvance() {
+    int index = 0;
+    // Append "-Action" to the name using an consuable action.
+    while ( catItr.tryAdvance( cc -> cc.getJson().put( "LDL", "-Test") ) ) {
+      index++;
+    }
+    assertTrue( index >= 15  );
   }
 
   @org.junit.jupiter.api.Test
   void trySplit() {
+    // 16 div 2
+    Spliterator<CatalogCompariable> si = catItr.trySplit();
+    assertEquals( 8, si.estimateSize() );
+    // 8 div 2
+    si = si.trySplit();
+    assertEquals( 4, si.estimateSize() );
+    si = si.trySplit();
+    assertNull( si );
   }
 
   @org.junit.jupiter.api.Test
-  void estimateSize() {
+  void functionalStreamingTest() {
+    // See if we can filter out the first 50 resources
+    Stream<CatalogCompariable> ccStream = StreamSupport.stream( catItr, true );
+    List<CatalogCompariable> ccList = ccStream.parallel().collect( Collectors.toList() );
+    assertEquals( 16, ccList.size() );
   }
+
 }
