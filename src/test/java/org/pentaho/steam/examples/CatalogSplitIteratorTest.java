@@ -111,10 +111,22 @@ class CatalogSplitIteratorTest {
 
   @org.junit.jupiter.api.Test
   void functionalStreamingTest() {
-    // See if we can filter out the first 50 resources
     Stream<CatalogCompariable> ccStream = StreamSupport.stream( catItr, true );
     List<CatalogCompariable> ccList = ccStream.parallel().collect( Collectors.toList() );
     assertEquals( 16, ccList.size() );
+
+    catItr.reset();;
+    ccStream = StreamSupport.stream( catItr, true );
+    ccList = ccStream.parallel().sorted().collect( Collectors.toList() );
+    assertEquals( 0, ccList.get( 0 ).getPos() );
+    assertEquals( 15, ccList.get( 15 ).getPos() );
+
+    catItr.reset();;
+    ccStream = StreamSupport.stream( catItr, true );
+    // Filter out even positions
+    ccList = ccStream.parallel().sorted().filter( c -> { return ( ( c.getPos() % 2 ) == 0 ); } ).collect( Collectors.toList() );
+    assertEquals( 8, ccList.size() );
+    assertEquals( 0, ( ccList.get( 0 ).getPos() % 2 ) );
   }
 
 }
